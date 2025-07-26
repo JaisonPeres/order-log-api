@@ -4,7 +4,7 @@ export class Order {
   constructor(
     public readonly id: string,
     public readonly date: Date,
-    public readonly products: Product[]
+    public readonly products: Product[],
   ) {}
 
   get total(): number {

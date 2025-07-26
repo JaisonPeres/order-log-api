@@ -1,7 +1,7 @@
-import fastifySwagger from "@fastify/swagger";
-import fastifySwaggerUi from "@fastify/swagger-ui";
-import { jsonSchemaTransform } from "fastify-type-provider-zod";
-import { FastifyTypeInstance } from "../types";
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
+import { jsonSchemaTransform } from 'fastify-type-provider-zod';
+import { FastifyTypeInstance } from '../types';
 
 const TITLE = 'API';
 const DOC_VERSION = '1.0.0';
@@ -20,7 +20,6 @@ interface SwaggerTagsConfig {
 
 export class SwaggerConfig {
   static register(app: FastifyTypeInstance, tags: SwaggerTagsConfig[]) {
-
     app.register(fastifySwagger, {
       openapi: {
         info: {
@@ -44,7 +43,7 @@ export class SwaggerConfig {
       },
       transform: jsonSchemaTransform,
     });
-    
+
     app.register(fastifySwaggerUi, {
       routePrefix: '/docs',
       uiConfig: {
@@ -53,7 +52,9 @@ export class SwaggerConfig {
       },
       staticCSP: true,
       transformStaticCSP: (header) => header,
-      transformSpecification: (swaggerObject, request, reply) => { return swaggerObject },
+      transformSpecification: (swaggerObject) => {
+        return swaggerObject;
+      },
       transformSpecificationClone: true,
       logLevel: 'silent',
     });

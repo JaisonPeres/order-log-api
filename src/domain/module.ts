@@ -1,4 +1,4 @@
-import { FastifyTypeInstance } from "../infrastructure/types";
+import { FastifyTypeInstance } from '../infrastructure/types';
 
 export interface IModule {
   register(app: FastifyTypeInstance): void;

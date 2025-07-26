@@ -8,7 +8,11 @@
     "start": "node dist/infrastructure/main.js",
     "build": "pnpm clean && pnpm compile",
     "clean": "rimraf dist && rimraf tsconfig.tsbuildinfo",
-    "compile": "ts-node esbuild.ts"
+    "compile": "ts-node esbuild.ts",
+    "lint": "eslint --config eslint.config.ts . --ext .ts",
+    "lint:fix": "eslint --config eslint.config.ts . --ext .ts --fix",
+    "format": "prettier --write 'src/**/*.{ts,js}'",
+    "format:check": "prettier --check 'src/**/*.{ts,js}'"
   },
   "keywords": [],
   "author": "",
@@ -27,14 +31,23 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@eslint/js": "^9.32.0",
     "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.38.0",
+    "@typescript-eslint/parser": "^8.38.0",
     "esbuild": "^0.24.0",
     "esbuild-copy-static-files": "^0.1.0",
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.3",
+    "jiti": "^2.5.1",
     "pino-pretty": "^13.0.0",
+    "prettier": "^3.6.2",
     "rimraf": "^5.0.10",
     "tiny-glob": "^0.2.9",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.38.0"
   }
 }

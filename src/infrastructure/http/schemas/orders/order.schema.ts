@@ -5,7 +5,7 @@ export const orderSchema = z.object({
   id: z.string(),
   date: z.string(),
   products: z.array(productSchema),
-  total: z.number()
+  total: z.number(),
 });
 
 export type OrderSchema = z.infer<typeof orderSchema>;
