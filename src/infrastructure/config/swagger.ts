@@ -55,6 +55,7 @@ export class SwaggerConfig {
       transformStaticCSP: (header) => header,
       transformSpecification: (swaggerObject, request, reply) => { return swaggerObject },
       transformSpecificationClone: true,
+      logLevel: 'silent',
     });
   }
 }
