@@ -1,0 +1,43 @@
+# Docker Compose file for dependency services only
+
+services:
+
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    container_name: logistics-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=vertical_logistica
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - logistics-network
+
+  # RabbitMQ for future worker implementation
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: logistics-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI port
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - logistics-network
+
+networks:
+  logistics-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
