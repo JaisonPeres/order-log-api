@@ -38,6 +38,11 @@ void (async () => {
         dest: './dist/infrastructure/static/swagger',
         recursive: true,
       }),
+      copyStaticFiles({
+        src: './src/infrastructure/db/migrations',
+        dest: './dist/infrastructure/db/migrations',
+        recursive: true,
+      }),
     ],
   });
 })();

@@ -8,11 +8,10 @@ const logger = Logger.create('ProcessOrderFile');
 export class ProcessOrderFile {
   constructor(private readonly repository: OrderRepositoryPort) {}
 
-  async execute(fileContent: string): Promise<User[]> {
+  async execute(fileContent: string): Promise<void> {
     const parsedUsers = this.parseLegacyFile(fileContent);
     logger.debug('Users processed:', parsedUsers.length);
-    // todo: save users to repository
-    return parsedUsers;
+    await this.repository.saveAll(parsedUsers);
   }
 
   parseLegacyFile(content: string): User[] {
