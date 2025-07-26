@@ -12,5 +12,5 @@ interface RouteDependencies {
 export class Routes {
   static register = fp(async (app: FastifyTypeInstance, opts: RouteDependencies) => {
     app.register(orderRoutesPlugin, opts);
-  })
+  });
 }

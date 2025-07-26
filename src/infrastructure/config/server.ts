@@ -1,6 +1,5 @@
-
 import { fastifyCors } from '@fastify/cors';
-import * as dotenv from "dotenv";
+import * as dotenv from 'dotenv';
 import { fastify } from 'fastify';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import { SwaggerConfig } from './swagger';
@@ -26,25 +25,24 @@ export async function createServer(): Promise<FastifyTypeInstance> {
     },
     production: true,
     test: false,
-  }
-  
+  };
+
   const server = fastify({
-    logger: envToLogger[STAGE as keyof typeof envToLogger] ?? true,
+    logger: LOG === 'false' ? false : (envToLogger[STAGE as keyof typeof envToLogger] ?? true),
   }).withTypeProvider<ZodTypeProvider>();
-  
+
   server.setValidatorCompiler(validatorCompiler);
   server.setSerializerCompiler(serializerCompiler);
 
   server.register(fastifyCors, {
     origin: '*',
   });
-  
+
   if (STAGE === 'development') {
     SwaggerConfig.register(server, [ordersRouteInfo]);
   }
 
   Routes.register(server, UseCasesBootstrap.start());
-
 
   server.get('/', async (request, reply) => {
     reply.send({
@@ -54,7 +52,7 @@ export async function createServer(): Promise<FastifyTypeInstance> {
       docs: '/docs',
     });
   });
-  
+
   server.setNotFoundHandler(async (request, reply) => {
     reply.status(404).send({
       message: 'Not found',

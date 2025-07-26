@@ -4,7 +4,7 @@ import { orderSchema } from './order.schema';
 export const userSchema = z.object({
   id: z.string(),
   name: z.string(),
-  orders: z.array(orderSchema)
+  orders: z.array(orderSchema),
 });
 
 export const usersSchema = z.array(userSchema);

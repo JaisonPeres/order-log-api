@@ -1,7 +1,8 @@
 import esbuild from 'esbuild';
 import glob from 'tiny-glob';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const copyStaticFiles = require('esbuild-copy-static-files')
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const copyStaticFiles = require('esbuild-copy-static-files');
 
 void (async () => {
   const entryPoints = await glob('./src/**/*.ts');
@@ -30,13 +31,13 @@ void (async () => {
       copyStaticFiles({
         src: './src/infrastructure/static',
         dest: './dist/infrastructure/static',
-        recursive: true
+        recursive: true,
       }),
       copyStaticFiles({
         src: './node_modules/@fastify/swagger-ui/static',
         dest: './dist/infrastructure/static/swagger',
-        recursive: true
-      })
+        recursive: true,
+      }),
     ],
   });
 })();
