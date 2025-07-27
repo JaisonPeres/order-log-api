@@ -5,6 +5,16 @@ import prettierConfig from 'eslint-config-prettier';
 import { Linter } from 'eslint';
 
 export default tseslint.config(
+  {
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      'coverage/**',
+      '.vscode/**',
+      '*.log',
+      'src/infrastructure/config/logger.ts',
+    ],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   prettierConfig,
@@ -25,13 +35,5 @@ export default tseslint.config(
         },
       ],
     },
-    ignores: [
-      'node_modules/**',
-      'dist/**',
-      'coverage/**',
-      '.vscode/**',
-      '*.log',
-      'src/infrastructure/config/logger.ts',
-    ],
   } as Linter.Config,
 );

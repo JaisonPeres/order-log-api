@@ -2,12 +2,12 @@ import { QueryOrders, OrderFilters } from '../../../../application/use-cases/que
 import { FastifyTypeInstance } from '../../../types';
 import { uploadFileSchema } from '../../schemas/orders/upload-file.schema';
 import { ProcessOrderFile } from '../../../../application/use-cases/process-order-file';
-import { UserMapper } from '../../mappers/user.mapper';
 import fp from 'fastify-plugin';
 import { errorSchema } from '../../schemas/error.schema';
 import { queryOrdersSchema } from '../../schemas/orders/query-orders.schema';
-import { usersSchema } from '../../schemas/orders/user.schema';
 import { Logger } from '../../../config/logger';
+import { UserMapper } from '../../mappers/user.mapper';
+import { responseUserSchema } from '../../schemas/orders/result-user.schema';
 const logger = Logger.create('OrdersRoutes');
 
 export interface OrdersPluginOptions {
@@ -47,7 +47,7 @@ export class OrdersRoutes {
           description: 'Upload a plain text file with orders',
           body: uploadFileSchema,
           response: {
-            200: usersSchema.describe('List of orders'),
+            200: 'OK',
             400: errorSchema.describe('Client Error'),
           },
           consumes: ['text/plain'],
@@ -56,11 +56,8 @@ export class OrdersRoutes {
       },
       async (request, reply) => {
         try {
-          const users = await this.processOrderFileUseCase.execute(request.body);
-
-          const responseData = UserMapper.toResponse(users);
-
-          return reply.status(200).send(responseData);
+          await this.processOrderFileUseCase.execute(request.body);
+          return reply.status(200).send();
         } catch (error) {
           logger.error('Error processing order file:', error);
           return reply.status(400).send({
@@ -81,7 +78,7 @@ export class OrdersRoutes {
           description: 'List all orders',
           querystring: queryOrdersSchema.describe('Query orders'),
           response: {
-            200: usersSchema.describe('List of orders'),
+            200: responseUserSchema.describe('List of orders'),
             500: errorSchema.describe('Server Error'),
           },
           consumes: ['application/json'],
@@ -102,13 +99,10 @@ export class OrdersRoutes {
             ...(endDate && { endDate: new Date(endDate) }),
           };
 
-          logger.info('Querying orders with filters:', filters);
+          const users = await this.queryOrdersUseCase.execute(filters);
+          const data = UserMapper.toResponse(users);
 
-          // const users = await this.queryOrdersUseCase.execute(filters);
-
-          // const responseData = UserMapper.toResponse(users);
-
-          return reply.status(200).send([]);
+          return reply.status(200).send(data);
         } catch (error) {
           logger.error('Error querying orders:', error);
           return reply.status(500).send({

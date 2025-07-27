@@ -5,20 +5,27 @@ import { OrderRepositoryPort } from '../ports/order-repository.port';
 import { Logger } from '../../infrastructure/config/logger';
 
 const logger = Logger.create('ProcessOrderFile');
+
+const COLUMN_SCHEMA: { [key: string]: [number, number] } = {
+  id: [0, 10],
+  name: [10, 55],
+  orderId: [55, 65],
+  productId: [65, 75],
+  amount: [75, 87], //71 +12
+  date: [87, 95],
+};
 export class ProcessOrderFile {
   constructor(private readonly repository: OrderRepositoryPort) {}
 
-  async execute(fileContent: string): Promise<User[]> {
+  async execute(fileContent: string): Promise<void> {
     const parsedUsers = this.parseLegacyFile(fileContent);
-    logger.debug('Users processed:', parsedUsers.length);
-    // todo: save users to repository
-    return parsedUsers;
+    await this.repository.saveAll(parsedUsers);
   }
 
   parseLegacyFile(content: string): User[] {
     const lines = content.split('\n').filter((line) => line.trim().length > 0);
 
-    const usersMap = new Map<string, User>();
+    const usersMap = new Map<number, User>();
 
     for (const line of lines) {
       if (line.includes('userId') || line.includes('|-') || line.trim().length === 0) {
@@ -32,24 +39,12 @@ export class ProcessOrderFile {
         continue;
       }
 
-      const userIdStr = rawLine.substring(0, 10).trim();
-      const userName = rawLine.substring(10, 40).trim();
-      const productIdStr = rawLine.substring(50, 58).trim();
-      const valueStr = rawLine.substring(58, 67).trim();
-      const dateStr = rawLine.substring(67).trim();
-
-      const userId = userIdStr || '0';
-      const productId = productIdStr || '0';
-      const productValue = parseFloat(valueStr) || 0;
+      const { id, name, orderId, productId, amount, date } = this.parseLine(rawLine);
 
       let orderDate;
       try {
-        if (dateStr && dateStr.length >= 8) {
-          const year = parseInt(dateStr.substring(0, 4), 10) || 2000;
-          const month = (parseInt(dateStr.substring(4, 6), 10) || 1) - 1;
-          const day = parseInt(dateStr.substring(6, 8), 10) || 1;
-          orderDate = new Date(year, month, day);
-
+        if (date && date.length >= 10) {
+          orderDate = new Date(date);
           if (isNaN(orderDate.getTime())) {
             orderDate = new Date();
           }
@@ -58,25 +53,24 @@ export class ProcessOrderFile {
         }
       } catch (error: unknown) {
         logger.error(error as string);
-        logger.error(`Invalid date format: ${dateStr}`);
+        logger.error(`Invalid date format: ${date}`);
         orderDate = new Date();
       }
 
-      const product = new Product(productId, `Product ${productId}`, productValue);
+      const product = new Product(productId, `Product ${productId}`, amount);
 
-      let user = usersMap.get(userId);
+      let user = usersMap.get(id);
       if (!user) {
-        user = new User(userId, userName, []);
-        usersMap.set(userId, user);
+        user = new User(id, name, []);
+        usersMap.set(id, user);
       }
 
       let order = user.orders.find((o) => o.date.toDateString() === orderDate.toDateString());
 
       if (!order) {
-        const orderId = (Date.now() + Math.floor(Math.random() * 1000)).toString();
         order = new Order(orderId, orderDate, [product]);
 
-        usersMap.set(userId, new User(user.id, user.name, [...user.orders, order]));
+        usersMap.set(id, new User(user.id, user.name, [...user.orders, order]));
       } else {
         const orderIndex = user.orders.findIndex(
           (o) => o.date.toDateString() === orderDate.toDateString(),
@@ -87,10 +81,23 @@ export class ProcessOrderFile {
         const updatedOrders = [...user.orders];
         updatedOrders[orderIndex] = updatedOrder;
 
-        usersMap.set(userId, new User(user.id, user.name, updatedOrders));
+        usersMap.set(id, new User(user.id, user.name, updatedOrders));
       }
     }
 
     return Array.from(usersMap.values());
+  }
+
+  private parseLine(line: string) {
+    const get = (range: [number, number]) => line.slice(range[0], range[1]).trim();
+
+    return {
+      id: parseInt(get(COLUMN_SCHEMA.id)),
+      name: get(COLUMN_SCHEMA.name),
+      orderId: parseInt(get(COLUMN_SCHEMA.orderId)),
+      productId: parseInt(get(COLUMN_SCHEMA.productId)),
+      amount: parseFloat(get(COLUMN_SCHEMA.amount).replace(/\./g, '')) || 0,
+      date: get(COLUMN_SCHEMA.date).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'), // YYYY-MM-DD
+    };
   }
 }

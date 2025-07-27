@@ -1,21 +1,23 @@
 import { User } from '../../../domain/user';
-import { UsersSchema } from '../schemas/orders/user.schema';
+import { ResultUserSchema } from '../schemas/orders/result-user.schema';
 
 export class UserMapper {
-  static toResponse(users: User[]): UsersSchema {
+  static toResponse(users: User[]): ResultUserSchema {
     return users.map((user) => ({
-      id: user.id,
+      user_id: user.id,
       name: user.name,
       orders: user.orders.map((order) => ({
-        id: order.id,
-        date: order.date.toISOString(),
+        order_id: order.id,
+        total: this.parseMoney(order.products.reduce((sum, product) => sum + product.value, 0)),
+        date: order.date.toISOString().split('T')[0],
         products: order.products.map((product) => ({
-          id: product.id,
-          name: product.name,
-          value: product.value,
+          product_id: product.id,
+          product_value: this.parseMoney(product.value),
         })),
-        total: order.products.reduce((sum, product) => sum + product.value, 0),
       })),
     }));
+  }
+  static parseMoney(moneyInCents: number): string {
+    return (moneyInCents / 100).toString();
   }
 }
