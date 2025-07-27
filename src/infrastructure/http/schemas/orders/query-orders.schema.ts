@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const queryOrdersSchema = z.object({
-  orderId: z.string().optional(),
+  orderId: z.number().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });

@@ -1,8 +1,9 @@
+import { integer } from 'drizzle-orm/pg-core';
 import { text } from 'drizzle-orm/pg-core';
 import { pgTable } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
-  id: text('id').primaryKey(),
+  id: integer('id').primaryKey(),
   name: text('name').notNull(),
 });
 

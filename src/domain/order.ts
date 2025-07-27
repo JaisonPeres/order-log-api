@@ -2,7 +2,7 @@ import { Product } from './product';
 
 export class Order {
   constructor(
-    public readonly id: string,
+    public readonly id: number,
     public readonly date: Date,
     public readonly products: Product[],
   ) {}

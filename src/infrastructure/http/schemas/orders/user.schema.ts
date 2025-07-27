@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { orderSchema } from './order.schema';
 
 export const userSchema = z.object({
-  id: z.string(),
+  id: z.number(),
   name: z.string(),
   orders: z.array(orderSchema),
 });

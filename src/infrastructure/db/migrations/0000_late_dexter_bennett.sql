@@ -1,19 +1,19 @@
 CREATE TABLE "users" (
-	"id" text PRIMARY KEY NOT NULL,
+	"id" integer PRIMARY KEY NOT NULL,
 	"name" text NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "orders" (
-	"id" text PRIMARY KEY NOT NULL,
-	"user_id" text NOT NULL,
+	"id" integer PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
 	"order_date" timestamp NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "order_products" (
-	"order_id" text NOT NULL,
-	"product_id" text NOT NULL,
+	"order_id" integer NOT NULL,
+	"product_id" integer NOT NULL,
 	"product_name" text NOT NULL,
-	"product_value" numeric(10, 2) NOT NULL,
+	"product_value" integer NOT NULL,
 	CONSTRAINT "order_products_order_id_product_id_pk" PRIMARY KEY("order_id","product_id")
 );
 --> statement-breakpoint

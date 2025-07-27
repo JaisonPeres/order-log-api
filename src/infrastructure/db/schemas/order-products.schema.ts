@@ -1,22 +1,20 @@
-import { numeric } from 'drizzle-orm/pg-core';
 import { text } from 'drizzle-orm/pg-core';
 import { pgTable } from 'drizzle-orm/pg-core';
 import { orders } from './orders.schema';
 import { primaryKey } from 'drizzle-orm/pg-core';
+import { integer } from 'drizzle-orm/pg-core';
 
 export const orderProducts = pgTable(
   'order_products',
   {
-    orderId: text('order_id')
+    orderId: integer('order_id')
       .notNull()
       .references(() => orders.id),
-    productId: text('product_id').notNull(),
+    productId: integer('product_id').notNull(),
     productName: text('product_name').notNull(),
-    productValue: numeric('product_value', { precision: 10, scale: 2 }).notNull(),
+    productValue: integer('product_value').notNull(), // in cents
   },
-  (t) => ({
-    pk: primaryKey({ columns: [t.orderId, t.productId] }),
-  }),
+  (t) => [primaryKey({ columns: [t.orderId, t.productId] })],
 );
 
 export type OrderProductSelect = typeof orderProducts.$inferSelect;
