@@ -56,7 +56,6 @@ export class SwaggerConfig {
         return swaggerObject;
       },
       transformSpecificationClone: true,
-      logLevel: 'silent',
     });
   }
 }

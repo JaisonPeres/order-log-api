@@ -8,6 +8,7 @@ import { queryOrdersSchema } from '../../schemas/orders/query-orders.schema';
 import { Logger } from '../../../config/logger';
 import { UserMapper } from '../../mappers/user.mapper';
 import { responseUserSchema } from '../../schemas/orders/result-user.schema';
+import { emptySuccessSchema } from '../../schemas/success.schema';
 const logger = Logger.create('OrdersRoutes');
 
 export interface OrdersPluginOptions {
@@ -47,7 +48,7 @@ export class OrdersRoutes {
           description: 'Upload a plain text file with orders',
           body: uploadFileSchema,
           response: {
-            200: 'OK',
+            200: emptySuccessSchema.describe('Success'),
             400: errorSchema.describe('Client Error'),
           },
           consumes: ['text/plain'],
