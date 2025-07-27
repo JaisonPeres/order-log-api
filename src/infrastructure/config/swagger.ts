@@ -5,13 +5,16 @@ import { FastifyTypeInstance } from '../types';
 
 const TITLE = 'API';
 const DOC_VERSION = '1.0.0';
-const GITHUB_URL = 'https://github.com/JaisonPeres';
+const PROJECT_REPOSITORY = 'https://github.com/JaisonPeres/order-log-api';
 const EMAIL = 'jaisoncperes@gmail.com';
 const NAME = 'Jaison Peres';
 const URL = 'https://github.com/JaisonPeres';
 const LICENSE_NAME = 'MIT';
 const LICENSE_URL = 'https://opensource.org/licenses/MIT';
-const DESCRIPTION = 'This is the API documentation.';
+const DESCRIPTION = `
+  This is the API documentation for the Order Log API.<br/>
+  <a href="${PROJECT_REPOSITORY}" target="_blank">Github Repository</a>
+`;
 
 interface SwaggerTagsConfig {
   name: string;
@@ -37,7 +40,7 @@ export class SwaggerConfig {
             url: LICENSE_URL,
           },
           summary: DESCRIPTION,
-          termsOfService: GITHUB_URL,
+          termsOfService: PROJECT_REPOSITORY,
         },
         tags,
       },
