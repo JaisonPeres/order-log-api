@@ -1,8 +1,9 @@
 import { User } from '../../domain/user';
 import { Order } from '../../domain/order';
 import { Product } from '../../domain/product';
-import { OrderRepositoryPort } from '../ports/order-repository.port';
+import { RabbitMQAdapterPort } from '../ports/rabbitmq-adapter.port';
 import { Logger } from '../../infrastructure/config/logger';
+import { v4 as uuidv4 } from 'uuid';
 
 const logger = Logger.create('ProcessOrderFile');
 
@@ -15,11 +16,31 @@ const COLUMN_SCHEMA: { [key: string]: [number, number] } = {
   date: [87, 95],
 };
 export class ProcessOrderFile {
-  constructor(private readonly repository: OrderRepositoryPort) {}
+  private readonly logger = Logger.create('ProcessOrderFile');
+  private readonly queueName = 'user-orders';
+
+  constructor(private readonly rabbitMQAdapter: RabbitMQAdapterPort) {}
 
   async execute(fileContent: string): Promise<void> {
     const parsedUsers = this.parseLegacyFile(fileContent);
-    await this.repository.saveAll(parsedUsers);
+
+    await this.rabbitMQAdapter.connect();
+
+    // Send each user to the queue
+    for (const user of parsedUsers) {
+      try {
+        await this.rabbitMQAdapter.publish(this.queueName, user, {
+          messageId: uuidv4(),
+          timestamp: new Date(),
+          persistent: true,
+        });
+      } catch (error) {
+        this.logger.error(`Failed to send user ${user.id} to queue:`, error);
+        throw error;
+      }
+    }
+
+    this.logger.info(`Processed ${parsedUsers.length} users from file`);
   }
 
   parseLegacyFile(content: string): User[] {

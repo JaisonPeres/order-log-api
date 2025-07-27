@@ -1,7 +1,7 @@
 import { User } from '../../domain/user';
 
 export interface FindFilters {
-  orderId?: string;
+  orderId?: number;
   startDate?: Date;
   endDate?: Date;
 }

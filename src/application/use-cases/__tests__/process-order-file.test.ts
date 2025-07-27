@@ -1,20 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProcessOrderFile } from '../process-order-file';
-import { OrderRepositoryPort } from '../../ports/order-repository.port';
+import { RabbitMQAdapterPort } from '../../ports/rabbitmq-adapter.port';
 import { User } from '../../../domain/user';
 import { Order } from '../../../domain/order';
 
 describe('ProcessOrderFile', () => {
   let processOrderFile: ProcessOrderFile;
-  let mockOrderRepository: OrderRepositoryPort;
+  let mockRabbitMQAdapter: RabbitMQAdapterPort;
 
   beforeEach(() => {
-    mockOrderRepository = {
-      saveAll: vi.fn().mockResolvedValue(undefined),
-      find: vi.fn(),
+    mockRabbitMQAdapter = {
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      assertQueue: vi.fn().mockResolvedValue(undefined),
+      publish: vi.fn().mockResolvedValue(undefined),
+      consume: vi.fn().mockResolvedValue(undefined),
+      setupDeadLetterQueue: vi.fn().mockResolvedValue(undefined),
     };
 
-    processOrderFile = new ProcessOrderFile(mockOrderRepository);
+    processOrderFile = new ProcessOrderFile(mockRabbitMQAdapter);
   });
 
   describe('parseLegacyFile', () => {
@@ -102,7 +106,17 @@ describe('ProcessOrderFile', () => {
 
       // Assert
       expect(parseLegacyFileSpy).toHaveBeenCalledWith(fileContent);
-      expect(mockOrderRepository.saveAll).toHaveBeenCalledWith(parsedUsers);
+      expect(mockRabbitMQAdapter.connect).toHaveBeenCalled();
+      expect(mockRabbitMQAdapter.publish).toHaveBeenCalledTimes(parsedUsers.length);
+      expect(mockRabbitMQAdapter.publish).toHaveBeenCalledWith(
+        'user-orders',
+        parsedUsers[0],
+        expect.objectContaining({
+          messageId: expect.any(String),
+          timestamp: expect.any(Date),
+          persistent: true,
+        }),
+      );
     });
   });
 });

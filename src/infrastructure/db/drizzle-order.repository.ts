@@ -3,14 +3,8 @@ import { db } from './client';
 import { User as DomainUser } from '../../domain/user';
 import { Order as DomainOrder } from '../../domain/order';
 import { Product as DomainProduct } from '../../domain/product';
-import { OrderRepositoryPort } from '../../application/ports/order-repository.port';
+import { FindFilters, OrderRepositoryPort } from '../../application/ports/order-repository.port';
 import { users, orders, orderProducts } from './schemas';
-
-interface FindFilters {
-  orderId?: string;
-  startDate?: Date;
-  endDate?: Date;
-}
 
 export class DrizzleOrderRepository implements OrderRepositoryPort {
   async saveAll(domainUsers: DomainUser[]): Promise<void> {
