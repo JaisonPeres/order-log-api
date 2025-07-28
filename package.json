@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx watch src/infrastructure/main.ts",
+    "dev:worker": "tsx watch src/infrastructure/workers/start-order-worker.ts",
     "start": "node dist/infrastructure/main.js",
+    "start:worker": "node dist/infrastructure/workers/start-order-worker.js",
     "build": "pnpm clean && pnpm compile",
     "clean": "rimraf dist && rimraf tsconfig.tsbuildinfo",
     "compile": "ts-node esbuild.ts",
