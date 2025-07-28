@@ -45,6 +45,8 @@ src/
 │   ├── config/         # Configuração do servidor e da aplicação
 │   ├── db/             # Conexão com banco de dados e repositórios
 │   ├── http/           # Rotas HTTP e controladores
+│   ├── rabbitmq/       # Adaptadores e workers para RabbitMQ
+│   ├── workers/        # Workers para processamento assíncrono
 │   └── types/          # Definições de tipos TypeScript
 ```
 
@@ -71,6 +73,8 @@ PORT=3000             # Porta do servidor
 LOG=true              # Habilitar/desabilitar logs
 STAGE=development     # Estágio do ambiente (development, production)
 DATABASE_URL=         # String de conexão PostgreSQL
+RABBITMQ_URL=         # URL de conexão RabbitMQ (ex: amqp://localhost:5672)
+RABBITMQ_QUEUE=       # Nome da fila RabbitMQ (ex: user-orders)
 ```
 
 ## Executando a Aplicação
@@ -78,7 +82,11 @@ DATABASE_URL=         # String de conexão PostgreSQL
 ### Modo de Desenvolvimento com TSX
 
 ```bash
+# Iniciar o servidor API
 pnpm dev
+
+# Iniciar o worker de processamento de pedidos
+pnpm dev:worker
 ```
 
 Isso iniciará o servidor com hot-reload usando tsx. Acesse a aplicação em http://localhost:3000 e a documentação Swagger em http://localhost:3000/docs (disponível no modo de desenvolvimento).
@@ -91,9 +99,55 @@ pnpm build
 
 Isso limpará o diretório dist e compilará o código TypeScript usando esbuild.
 
+### Executando em Produção
+
+```bash
+# Iniciar o servidor API
+pnpm start
+
+# Iniciar o worker de processamento de pedidos
+pnpm start:worker
+```
+
 ## Documentação da API
 
 Quando executado no modo de desenvolvimento, a documentação Swagger está disponível em `/docs`. Isso fornece uma interface interativa para explorar e testar os endpoints da API.
+
+## Workers de Processamento
+
+### Worker de Processamento de Pedidos
+
+O projeto inclui um worker para processamento assíncrono de pedidos que consome mensagens de uma fila RabbitMQ.
+
+#### Funcionalidades
+
+- Processamento assíncrono de pedidos recebidos via fila RabbitMQ
+- Gerenciamento automático de conexões e reconexões com RabbitMQ
+- Tratamento de erros e logging detalhado
+- Graceful shutdown ao receber sinais SIGINT ou SIGTERM
+
+#### Configuração
+
+O worker requer as seguintes variáveis de ambiente:
+
+```
+RABBITMQ_URL=amqp://localhost:5672    # URL de conexão com o RabbitMQ
+RABBITMQ_QUEUE=user-orders            # Nome da fila a ser consumida
+```
+
+#### Execução
+
+Para iniciar o worker em modo de desenvolvimento com hot-reload:
+
+```bash
+pnpm dev:worker
+```
+
+Para iniciar o worker em produção:
+
+```bash
+pnpm start:worker
+```
 
 ## Licença
 
