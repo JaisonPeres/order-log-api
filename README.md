@@ -109,13 +109,23 @@ Quando executado no modo de desenvolvimento, a documentação Swagger está disp
 
 ## Sistema de Filas e Processamento Assíncrono
 
+### Arquitetura do Worker
+
+O sistema de processamento assíncrono é baseado em uma arquitetura de workers que consomem mensagens de filas RabbitMQ. A implementação segue os princípios de Clean Architecture com clara separação entre domínio, adaptação e infraestrutura.
+
+#### Componentes Principais
+
+- **OrderProcessingWorker**: Responsável pelo processamento de pedidos em lote
+- **RabbitMQAdapter**: Abstrai a comunicação com o RabbitMQ
+- **DrizzleOrderRepository**: Persiste os dados no PostgreSQL
+
 ### Estrutura de Filas
 
 O sistema utiliza RabbitMQ para processamento assíncrono de pedidos com a seguinte estrutura de filas:
 
 1. **user-orders**: Fila principal que recebe mensagens de pedidos de usuários para processamento
 2. **user-orders.dlq**: Fila de mensagens mortas (Dead Letter Queue) para mensagens que não puderam ser processadas
-3. **user-orders.retry**: Fila de retry para reprocessamento de mensagens após um atraso
+3. **user-orders.retry**: Fila de retry para reprocessamento de mensagens após um atraso de 30 segundos
 
 ### Processamento em Lote
 
@@ -125,6 +135,16 @@ O worker de processamento implementa as seguintes funcionalidades:
 - **Flush Periódico**: A cada 5 segundos, processa qualquer lote parcial para evitar atrasos em períodos de baixo volume
 - **Shutdown Gracioso**: Processa mensagens pendentes antes de desconectar durante o desligamento
 - **Tratamento de Erros**: Mensagens com erro são enviadas para a DLQ para análise posterior
+- **Reconexão Automática**: Implementa backoff exponencial para reconexão em caso de falhas na conexão com RabbitMQ
+
+### Mecanismo de Retry
+
+O sistema implementa um mecanismo sofisticado de retry para mensagens com falha:
+
+1. Mensagens que falham no processamento são enviadas para a DLQ
+2. Um consumidor dedicado monitora a DLQ e tenta reprocessar as mensagens
+3. Mensagens são rastreadas com contador de tentativas (`x-retry-count`)
+4. Após uma tentativa de reprocessamento, mensagens que continuam falhando são descartadas
 
 ### Formato das Mensagens
 
@@ -137,21 +157,49 @@ interface UserOrderMessage {
     date: string;
     products: {
       id: number;
+      name: string;
       value: number;
     }[];
   }[];
 }
 ```
 
+### Inicialização do Worker
+
+O processo de inicialização do worker segue os seguintes passos:
+
+1. Conecta ao RabbitMQ usando o adaptador
+2. Configura as filas (principal, DLQ e retry)
+3. Inicia o consumidor principal com prefetch configurado
+4. Inicia o consumidor da DLQ para reprocessamento
+5. Configura handlers para shutdown gracioso (SIGINT/SIGTERM)
+
 ### Executando o Worker
 
-Para iniciar o worker de processamento de pedidos:
+#### Modo de Desenvolvimento
+
+```bash
+pnpm dev:worker
+```
+
+Inicia o worker com hot-reload usando tsx, ideal para desenvolvimento.
+
+#### Modo de Produção
 
 ```bash
 pnpm start:worker
 ```
 
-O worker se conectará ao RabbitMQ usando as variáveis de ambiente configuradas e começará a consumir mensagens da fila principal.
+Inicia o worker a partir do código compilado em `dist/`, otimizado para produção.
+
+### Monitoramento e Logs
+
+O worker utiliza um sistema de logging estruturado que fornece informações detalhadas sobre:
+
+- Conexões e reconexões com RabbitMQ
+- Processamento de mensagens e tamanho do buffer
+- Erros e exceções durante o processamento
+- Tentativas de reprocessamento de mensagens da DLQ
 
 ## Licença
 
