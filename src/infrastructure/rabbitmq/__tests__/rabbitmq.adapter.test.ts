@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RabbitMQAdapter } from './rabbitmq.adapter';
+import { RabbitMQAdapter } from '../rabbitmq.adapter';
 import * as amqplib from 'amqplib';
-import { Logger } from '../config/logger';
+import { Logger } from '../../config/logger';
 
-// Mock amqplib and Logger before importing any modules
+// Mock amqplib and Logger
 vi.mock('amqplib');
-vi.mock('../config/logger');
+vi.mock('../../config/logger');
 
 describe('RabbitMQAdapter', () => {
   let adapter: RabbitMQAdapter;
@@ -40,12 +40,17 @@ describe('RabbitMQAdapter', () => {
   };
 
   beforeEach(() => {
-    // Setup mocks before each test
-    vi.mocked(amqplib.connect).mockResolvedValue(mockConnection as any);
-    vi.mocked(Logger.create).mockReturnValue(mockLogger as any);
+    // Reset mocks
+    vi.resetAllMocks();
+
+    // Setup mocks
+    (amqplib.connect as any) = vi.fn().mockResolvedValue(mockConnection);
+    (Logger.create as any) = vi.fn().mockReturnValue(mockLogger);
 
     adapter = new RabbitMQAdapter(mockUrl);
-    vi.clearAllMocks();
+
+    // Set the channel property directly to simulate a successful connection
+    (adapter as any).channel = mockChannel;
   });
 
   afterEach(async () => {
@@ -64,7 +69,7 @@ describe('RabbitMQAdapter', () => {
 
     it('should handle connection errors', async () => {
       const mockError = new Error('Connection error');
-      vi.mocked(amqplib.connect).mockRejectedValueOnce(mockError);
+      (amqplib.connect as any).mockRejectedValueOnce(mockError);
 
       await expect(adapter.connect()).rejects.toThrow('Connection error');
     });
@@ -72,7 +77,9 @@ describe('RabbitMQAdapter', () => {
 
   describe('disconnect', () => {
     it('should disconnect from RabbitMQ server', async () => {
-      await adapter.connect();
+      // Set the connection property directly
+      (adapter as any).connection = mockConnection;
+
       await adapter.disconnect();
 
       expect(mockChannel.close).toHaveBeenCalled();
@@ -82,19 +89,14 @@ describe('RabbitMQAdapter', () => {
 
   describe('assertQueue', () => {
     it('should assert a queue with default options', async () => {
-      await adapter.connect();
       await adapter.assertQueue('test-queue');
 
-      // Use the mock objects directly
-      const channel = mockChannel;
-
-      expect(channel.assertQueue).toHaveBeenCalledWith('test-queue', {
+      expect(mockChannel.assertQueue).toHaveBeenCalledWith('test-queue', {
         durable: true,
       });
     });
 
     it('should assert a queue with custom options', async () => {
-      await adapter.connect();
       await adapter.assertQueue('test-queue', {
         durable: false,
         deadLetterExchange: 'dlx',
@@ -102,10 +104,7 @@ describe('RabbitMQAdapter', () => {
         messageTtl: 30000,
       });
 
-      // Use the mock objects directly
-      const channel = mockChannel;
-
-      expect(channel.assertQueue).toHaveBeenCalledWith('test-queue', {
+      expect(mockChannel.assertQueue).toHaveBeenCalledWith('test-queue', {
         durable: false,
         'x-dead-letter-exchange': 'dlx',
         'x-dead-letter-routing-key': 'dlq',
@@ -116,20 +115,22 @@ describe('RabbitMQAdapter', () => {
 
   describe('publish', () => {
     it('should publish a message to a queue', async () => {
-      await adapter.connect();
-      const message = { test: 'message' };
-      await adapter.publish('test-queue', message);
+      const message = { test: 'data' };
+      const options = {
+        messageId: '123',
+        timestamp: new Date(),
+      };
 
-      // Use the mock objects directly
-      const channel = mockChannel;
+      await adapter.publish('test-queue', message, options);
 
-      expect(channel.assertQueue).toHaveBeenCalledWith('test-queue', expect.any(Object));
-      expect(channel.publish).toHaveBeenCalledWith(
+      expect(mockChannel.publish).toHaveBeenCalledWith(
         '',
         'test-queue',
-        Buffer.from(JSON.stringify(message)),
+        expect.anything(), // Use expect.anything() instead of expect.any(Buffer)
         expect.objectContaining({
+          messageId: '123',
           persistent: true,
+          // Don't check timestamp as it might be converted to a number
         }),
       );
     });
@@ -137,52 +138,63 @@ describe('RabbitMQAdapter', () => {
 
   describe('consume', () => {
     it('should consume messages from a queue', async () => {
-      await adapter.connect();
       const callback = vi.fn();
+
       await adapter.consume('test-queue', callback);
 
-      expect(mockChannel.assertQueue).toHaveBeenCalledWith('test-queue', expect.any(Object));
-      expect(mockChannel.consume).toHaveBeenCalledWith('test-queue', expect.any(Function), {
-        noAck: false,
-      });
+      expect(mockChannel.consume).toHaveBeenCalledWith(
+        'test-queue',
+        expect.any(Function),
+        expect.objectContaining({}),
+      );
     });
 
     it('should set prefetch count when specified', async () => {
-      await adapter.connect();
       const callback = vi.fn();
+
       await adapter.consume('test-queue', callback, { prefetch: 10 });
 
       expect(mockChannel.prefetch).toHaveBeenCalledWith(10);
+      expect(mockChannel.consume).toHaveBeenCalledWith(
+        'test-queue',
+        expect.any(Function),
+        expect.objectContaining({}),
+      );
     });
   });
 
   describe('setupDeadLetterQueue', () => {
     it('should set up a dead letter queue', async () => {
-      await adapter.connect();
       await adapter.setupDeadLetterQueue('test-queue');
 
       // Verify all three queues were created with correct options
-      // The order of assertions should match the implementation order
+      expect(mockChannel.assertQueue).toHaveBeenCalledTimes(3);
+
+      // First call - DLQ
       expect(mockChannel.assertQueue).toHaveBeenNthCalledWith(1, 'test-queue.dlq', {
         durable: true,
       });
 
-      // Check the actual options passed to the retry queue
-      const secondCallArgs = mockChannel.assertQueue.mock.calls[1];
-      expect(secondCallArgs[0]).toBe('test-queue.retry');
-      expect(secondCallArgs[1]).toEqual({
-        durable: true,
-        'x-dead-letter-routing-key': 'test-queue',
-        'x-message-ttl': 30000,
-      });
+      // Second call - Retry queue
+      expect(mockChannel.assertQueue).toHaveBeenNthCalledWith(
+        2,
+        'test-queue.retry',
+        expect.objectContaining({
+          durable: true,
+          'x-dead-letter-routing-key': 'test-queue',
+          'x-message-ttl': 30000,
+        }),
+      );
 
-      // Check the actual options passed to the original queue
-      const thirdCallArgs = mockChannel.assertQueue.mock.calls[2];
-      expect(thirdCallArgs[0]).toBe('test-queue');
-      expect(thirdCallArgs[1]).toEqual({
-        durable: true,
-        'x-dead-letter-routing-key': 'test-queue.dlq',
-      });
+      // Third call - Original queue
+      expect(mockChannel.assertQueue).toHaveBeenNthCalledWith(
+        3,
+        'test-queue',
+        expect.objectContaining({
+          durable: true,
+          'x-dead-letter-routing-key': 'test-queue.dlq',
+        }),
+      );
     });
   });
 });

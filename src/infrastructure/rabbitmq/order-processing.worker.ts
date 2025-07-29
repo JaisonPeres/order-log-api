@@ -4,6 +4,7 @@ import { User } from '../../domain/user';
 import { Order } from '../../domain/order';
 import { Logger } from '../config/logger';
 import { Product } from '../../domain/product';
+import { getRabbitMQQueueConfig, RabbitMQQueueConfig } from '../config/rabbitmq-queue.config';
 
 export interface UserOrderMessage {
   id: number;
@@ -22,30 +23,31 @@ export interface UserOrderMessage {
 export class OrderProcessingWorker {
   private readonly queueName: string;
   private readonly dlqName: string;
-  private readonly maxPrefetch: number;
   private readonly logger = Logger.create('OrderProcessingWorker');
   private messageBuffer: User[] = [];
-  private readonly batchSize = 50;
   private processingBatch = false;
+  private readonly queueConfig: RabbitMQQueueConfig;
 
   constructor(
     private readonly rabbitMQAdapter: RabbitMQAdapterPort,
     private readonly orderRepository: OrderRepositoryPort,
     queueName = 'user-orders',
-    maxPrefetch = 50,
   ) {
     this.queueName = queueName;
     this.dlqName = `${queueName}.dlq`;
-    this.maxPrefetch = maxPrefetch;
+    this.queueConfig = getRabbitMQQueueConfig();
   }
 
+  /**
+   * Initialize the worker
+   */
   async initialize(): Promise<void> {
     try {
       // Connect to RabbitMQ
       await this.rabbitMQAdapter.connect();
 
-      // Setup the main queue and DLQ
-      await this.rabbitMQAdapter.setupDeadLetterQueue(this.queueName);
+      // Setup queues with configured parameters
+      await this.setupQueues();
 
       // Start consuming messages from the main queue
       await this.startConsumer();
@@ -60,6 +62,9 @@ export class OrderProcessingWorker {
     }
   }
 
+  /**
+   * Shutdown the worker
+   */
   async shutdown(): Promise<void> {
     try {
       // Process any remaining messages in the buffer
@@ -79,6 +84,9 @@ export class OrderProcessingWorker {
     }
   }
 
+  /**
+   * Start a consumer to process messages from the main queue
+   */
   private async startConsumer(): Promise<void> {
     await this.rabbitMQAdapter.consume<UserOrderMessage>(
       this.queueName,
@@ -94,7 +102,7 @@ export class OrderProcessingWorker {
           );
 
           // Process batch if we've reached the batch size
-          if (this.messageBuffer.length >= this.batchSize) {
+          if (this.messageBuffer.length >= this.queueConfig.batchSize) {
             await this.processBatch();
           }
 
@@ -105,7 +113,7 @@ export class OrderProcessingWorker {
           nack(false);
         }
       },
-      { prefetch: this.batchSize },
+      { prefetch: this.queueConfig.prefetchCount },
     );
 
     // Set up a periodic batch processor to handle partial batches
@@ -114,9 +122,12 @@ export class OrderProcessingWorker {
         this.logger.info(`Processing partial batch of ${this.messageBuffer.length} messages`);
         await this.processBatch();
       }
-    }, 5000); // Check every 5 seconds
+    }, this.queueConfig.batchTimeout * 1000); // Convert to milliseconds
   }
 
+  /**
+   * Start a consumer to process messages from the DLQ
+   */
   private async startDLQConsumer(): Promise<void> {
     await this.rabbitMQAdapter.consume<UserOrderMessage>(
       this.dlqName,
@@ -124,12 +135,12 @@ export class OrderProcessingWorker {
         try {
           this.logger.info(`Reprocessing failed order from DLQ: ${message.messageId}`);
 
-          // Check if this message has already been retried
           const retryCount = message.retryCount || 0;
 
-          if (retryCount >= 1) {
-            // We've already tried once, log and acknowledge
-            this.logger.info(`Message ${message.messageId} has already been retried, discarding`);
+          if (retryCount >= this.queueConfig.maxRetries) {
+            this.logger.info(
+              `Message ${message.messageId} has reached max retries (${this.queueConfig.maxRetries}), discarding`,
+            );
             ack();
             return;
           }
@@ -146,13 +157,12 @@ export class OrderProcessingWorker {
 
           const retryCount = (message.retryCount || 0) + 1;
 
-          if (retryCount >= 1) {
+          if (retryCount >= this.queueConfig.maxRetries) {
             this.logger.error(
-              `Permanently failed to process order ${message.messageId} after retry`,
+              `Permanently failed to process order ${message.messageId} after ${this.queueConfig.maxRetries} retries`,
             );
             ack();
           } else {
-            // Send back to DLQ with incremented retry count
             await this.rabbitMQAdapter.publish(this.dlqName, message.content, {
               messageId: message.messageId,
               timestamp: new Date(),
@@ -168,6 +178,11 @@ export class OrderProcessingWorker {
     );
   }
 
+  /**
+   * Map a message to a domain user
+   * @param message User order message
+   * @returns Domain user
+   */
   private mapMessageToDomainUser(message: UserOrderMessage): User {
     const orders = message.orders.map((order) => {
       const orderDate = new Date(order.date);
@@ -197,7 +212,6 @@ export class OrderProcessingWorker {
         `Persisting batch of ${batchToProcess.length} users in a single transaction`,
       );
 
-      // Save all users in a single transaction
       await this.orderRepository.saveAll(batchToProcess);
 
       this.logger.info(`Successfully persisted batch of ${batchToProcess.length} users`);
@@ -228,5 +242,35 @@ export class OrderProcessingWorker {
     for (const message of messages) {
       await this.publishOrder(message);
     }
+  }
+
+  /**
+   * Set up queues with the configured parameters
+   */
+  private async setupQueues(): Promise<void> {
+    await this.rabbitMQAdapter.assertQueue(this.queueName, {
+      durable: this.queueConfig.queueDurability,
+      messageTtl: this.queueConfig.messageTtl,
+    });
+    await this.rabbitMQAdapter.assertQueue(this.dlqName, {
+      durable: this.queueConfig.queueDurability,
+      messageTtl: this.queueConfig.dlqTtl * 1000,
+    });
+
+    const retryQueue = `${this.queueName}.retry`;
+    await this.rabbitMQAdapter.assertQueue(retryQueue, {
+      durable: this.queueConfig.queueDurability,
+      deadLetterExchange: '',
+      deadLetterRoutingKey: this.queueName,
+      messageTtl: this.queueConfig.retryDelay * 1000,
+    });
+
+    await this.rabbitMQAdapter.assertQueue(this.queueName, {
+      durable: this.queueConfig.queueDurability,
+      deadLetterExchange: '',
+      deadLetterRoutingKey: this.dlqName,
+    });
+
+    this.logger.info('Queue setup complete');
   }
 }
