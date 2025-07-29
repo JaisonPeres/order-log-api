@@ -1,5 +1,9 @@
 # API de Upload de Arquivo de Pedidos
 
+Documentação Online
+
+**[https://order-log-api-doc-site.vercel.app/](https://order-log-api-doc-site.vercel.app/)**
+
 ## Descrição
 
 Uma API moderna construída com Fastify, Zod para validação e Swagger para documentação. Este projeto é executado como um servidor TypeScript tradicional e utiliza RabbitMQ para processamento assíncrono de pedidos em lote.
@@ -105,7 +109,16 @@ Isso limpará o diretório dist e compilará o código TypeScript usando esbuild
 
 ## Documentação da API
 
-Quando executado no modo de desenvolvimento, a documentação Swagger está disponível em `/docs`. Isso fornece uma interface interativa para explorar e testar os endpoints da API.
+### Swagger UI Local
+
+Quando executado no modo de desenvolvimento, a documentação Swagger está disponível em `/docs`. Isso fornece uma interface interativa para explorar e testar os endpoints da API localmente.
+
+A Swagger UI permite:
+
+- Visualizar todos os endpoints disponíveis
+- Testar requisições diretamente na interface
+- Visualizar modelos de dados e esquemas
+- Baixar a especificação OpenAPI em formato JSON ou YAML
 
 ## Sistema de Filas e Processamento Assíncrono
 

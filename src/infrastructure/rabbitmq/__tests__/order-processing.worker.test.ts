@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { OrderProcessingWorker, UserOrderMessage } from './order-processing.worker';
-import { RabbitMQAdapterPort } from '../../application/ports/rabbitmq-adapter.port';
-import { OrderRepositoryPort } from '../../application/ports/order-repository.port';
-import { User } from '../../domain/user';
-import { Logger } from '../config/logger';
+import { OrderProcessingWorker, UserOrderMessage } from '../order-processing.worker';
+import { RabbitMQAdapterPort } from '../../../application/ports/rabbitmq-adapter.port';
+import { OrderRepositoryPort } from '../../../application/ports/order-repository.port';
+import { User } from '../../../domain/user';
+import { Logger } from '../../config/logger';
+import * as queueConfig from '../../config/rabbitmq-queue.config';
 
 const logger = Logger.create('OrderProcessingWorkerTest');
 // Mock RabbitMQAdapter
@@ -23,7 +24,7 @@ const mockOrderRepository: OrderRepositoryPort = {
 };
 
 // Mock Logger
-vi.mock('../config/logger', () => {
+vi.mock('../../config/logger', () => {
   return {
     Logger: {
       create: () => ({
@@ -36,19 +37,30 @@ vi.mock('../config/logger', () => {
   };
 });
 
+// Mock RabbitMQQueueConfig
+vi.mock('../../config/rabbitmq-queue.config', () => {
+  return {
+    getRabbitMQQueueConfig: () => ({
+      batchSize: 50,
+      batchTimeout: 5,
+      prefetchCount: 100,
+      retryDelay: 30,
+      maxRetries: 3,
+      dlqTtl: 604800,
+      queueDurability: true,
+      messageTtl: 86400000,
+      autoDelete: false,
+    }),
+  };
+});
+
 describe('OrderProcessingWorker', () => {
   let worker: OrderProcessingWorker;
   const queueName = 'test-queue';
-  const maxPrefetch = 50;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    worker = new OrderProcessingWorker(
-      mockRabbitMQAdapter,
-      mockOrderRepository,
-      queueName,
-      maxPrefetch,
-    );
+    worker = new OrderProcessingWorker(mockRabbitMQAdapter, mockOrderRepository, queueName);
   });
 
   afterEach(async () => {
@@ -64,7 +76,7 @@ describe('OrderProcessingWorker', () => {
       await worker.initialize();
 
       expect(mockRabbitMQAdapter.connect).toHaveBeenCalled();
-      expect(mockRabbitMQAdapter.setupDeadLetterQueue).toHaveBeenCalledWith(queueName);
+      expect(mockRabbitMQAdapter.assertQueue).toHaveBeenCalledTimes(4); // Main queue, DLQ, retry queue, and main queue again
       expect(mockRabbitMQAdapter.consume).toHaveBeenCalledTimes(2); // Main queue and DLQ
     });
 
@@ -204,6 +216,62 @@ describe('OrderProcessingWorker', () => {
         expect.objectContaining({
           messageId: expect.stringContaining('order-1-'),
           timestamp: expect.any(Date),
+        }),
+      );
+    });
+  });
+
+  describe('setupQueues', () => {
+    it('should set up all required queues with correct parameters', async () => {
+      // Access the private method using type assertion
+      const setupQueuesMethod = (
+        worker as unknown as { setupQueues: () => Promise<void> }
+      ).setupQueues.bind(worker);
+
+      await setupQueuesMethod();
+
+      const mockConfig = queueConfig.getRabbitMQQueueConfig();
+
+      // Check DLQ setup
+      expect(mockRabbitMQAdapter.assertQueue).toHaveBeenNthCalledWith(
+        1,
+        `${queueName}`,
+        expect.objectContaining({
+          durable: mockConfig.queueDurability,
+          messageTtl: mockConfig.messageTtl,
+        }),
+      );
+
+      // Check DLQ setup
+      expect(mockRabbitMQAdapter.assertQueue).toHaveBeenNthCalledWith(
+        2,
+        `${queueName}.dlq`,
+        expect.objectContaining({
+          durable: mockConfig.queueDurability,
+          messageTtl: mockConfig.dlqTtl * 1000,
+        }),
+      );
+
+      // Check retry queue setup
+      expect(mockRabbitMQAdapter.assertQueue).toHaveBeenNthCalledWith(
+        3,
+        `${queueName}.retry`,
+        expect.objectContaining({
+          durable: mockConfig.queueDurability,
+          deadLetterExchange: '',
+          deadLetterRoutingKey: queueName,
+          messageTtl: mockConfig.retryDelay * 1000,
+        }),
+      );
+
+      // Check main queue setup with DLQ routing
+      expect(mockRabbitMQAdapter.assertQueue).toHaveBeenNthCalledWith(
+        4,
+        queueName,
+        expect.objectContaining({
+          durable: mockConfig.queueDurability,
+          deadLetterExchange: '',
+          deadLetterRoutingKey: `${queueName}.dlq`,
         }),
       );
     });
