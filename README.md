@@ -91,6 +91,16 @@ RABBITMQ_DLQ=user-orders.dlq # Nome da fila de mensagens mortas
 
 ## Executando a Aplicação
 
+### Iniciando Serviços de Banco de Dados e RabbitMQ
+
+Antes de iniciar a aplicação, é necessário ter os serviços de banco de dados PostgreSQL e RabbitMQ em execução. Você pode iniciá-los facilmente usando Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+Este comando iniciará os contêineres definidos no arquivo docker-compose.yml em modo detached (segundo plano).
+
 ### Modo de Desenvolvimento com TSX
 
 ```bash
